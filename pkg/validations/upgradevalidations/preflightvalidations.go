@@ -201,6 +201,18 @@ func (u *UpgradeValidations) PreflightValidations(ctx context.Context) []validat
 				}
 			})
 	}
+
+	if !u.Opts.SkippedValidations[validations.CustomWebhook] {
+		upgradeValidations = append(
+			upgradeValidations,
+			func() *validations.ValidationResult {
+				return &validations.ValidationResult{
+					Name:        "validate custom webhooks",
+					Remediation: "ensure that any custom webhooks installed in the cluster won't interfere with the upgrade process",
+					Err:         ValidateCustomWebhooks(ctx, k, u.Opts.WorkloadCluster, u.Opts.SkippedValidations),
+				}
+			})
+	}
 	if !u.Opts.SkippedValidations[validations.EksaVersionSkew] {
 		upgradeValidations = append(
 			upgradeValidations,
