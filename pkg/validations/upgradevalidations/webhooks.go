@@ -13,11 +13,37 @@ import (
 	"github.com/aws/eks-anywhere/pkg/validations"
 )
 
+// IssueSeverity represents the severity level of a webhook issue
+type IssueSeverity int
+
+const (
+	// SeverityHigh represents high severity issues that could cause upgrade failures
+	SeverityHigh IssueSeverity = iota
+	// SeverityMedium represents medium severity issues that might cause problems during upgrades
+	SeverityMedium
+	// SeverityLow represents low severity issues that are unlikely to cause problems but should be noted
+	SeverityLow
+)
+
+// String returns the string representation of the severity level
+func (s IssueSeverity) String() string {
+	switch s {
+	case SeverityHigh:
+		return "High"
+	case SeverityMedium:
+		return "Medium"
+	case SeverityLow:
+		return "Low"
+	default:
+		return "Unknown"
+	}
+}
+
 // WebhookIssue represents a potential issue with a webhook that could interfere with upgrades
 type WebhookIssue struct {
 	Name        string
 	Description string
-	Severity    string // "High", "Medium", "Low"
+	Severity    IssueSeverity
 }
 
 // ValidateCustomWebhooks returns an error if any custom webhooks are detected on a cluster
@@ -72,10 +98,10 @@ func ValidateCustomWebhooks(ctx context.Context, k validations.KubectlClient, cl
 	var filteredIssues []WebhookIssue
 	for _, issue := range issues {
 		switch issue.Severity {
-		case "High":
+		case SeverityHigh:
 			// High severity issues are always included unless all webhook validations are skipped
 			filteredIssues = append(filteredIssues, issue)
-		case "Medium", "Low":
+		case SeverityMedium, SeverityLow:
 			// Medium and Low severity issues are included unless non-critical or all webhook validations are skipped
 			if !skippedValidations[validations.CustomWebhookNonCritical] {
 				filteredIssues = append(filteredIssues, issue)
@@ -107,7 +133,7 @@ func checkValidatingWebhookForIssues(webhookName string, webhooks []admissionreg
 			issues = append(issues, WebhookIssue{
 				Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 				Description: "Webhook has failurePolicy set to Fail, which could block API operations during upgrade if the webhook service is unavailable",
-				Severity:    "High",
+				Severity:    SeverityHigh,
 			})
 		}
 
@@ -116,7 +142,7 @@ func checkValidatingWebhookForIssues(webhookName string, webhooks []admissionreg
 			issues = append(issues, WebhookIssue{
 				Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 				Description: fmt.Sprintf("Webhook has a short timeout (%d seconds), which might not be sufficient during cluster load in an upgrade", *webhook.TimeoutSeconds),
-				Severity:    "Medium",
+				Severity:    SeverityMedium,
 			})
 		}
 
@@ -126,7 +152,7 @@ func checkValidatingWebhookForIssues(webhookName string, webhooks []admissionreg
 			issues = append(issues, WebhookIssue{
 				Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 				Description: fmt.Sprintf("Webhook intercepts critical resources that are modified during upgrades: %s", strings.Join(criticalResources, ", ")),
-				Severity:    "High",
+				Severity:    SeverityHigh,
 			})
 		}
 
@@ -139,7 +165,7 @@ func checkValidatingWebhookForIssues(webhookName string, webhooks []admissionreg
 				issues = append(issues, WebhookIssue{
 					Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 					Description: "Webhook service reference doesn't specify a port, which might cause connection issues",
-					Severity:    "Medium",
+					Severity:    SeverityMedium,
 				})
 			}
 		}
@@ -158,7 +184,7 @@ func checkMutatingWebhookForIssues(webhookName string, webhooks []admissionregis
 			issues = append(issues, WebhookIssue{
 				Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 				Description: "Webhook has failurePolicy set to Fail, which could block API operations during upgrade if the webhook service is unavailable",
-				Severity:    "High",
+				Severity:    SeverityHigh,
 			})
 		}
 
@@ -167,7 +193,7 @@ func checkMutatingWebhookForIssues(webhookName string, webhooks []admissionregis
 			issues = append(issues, WebhookIssue{
 				Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 				Description: fmt.Sprintf("Webhook has a short timeout (%d seconds), which might not be sufficient during cluster load in an upgrade", *webhook.TimeoutSeconds),
-				Severity:    "Medium",
+				Severity:    SeverityMedium,
 			})
 		}
 
@@ -177,7 +203,7 @@ func checkMutatingWebhookForIssues(webhookName string, webhooks []admissionregis
 			issues = append(issues, WebhookIssue{
 				Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 				Description: fmt.Sprintf("Webhook intercepts critical resources that are modified during upgrades: %s", strings.Join(criticalResources, ", ")),
-				Severity:    "High",
+				Severity:    SeverityHigh,
 			})
 		}
 
@@ -190,7 +216,7 @@ func checkMutatingWebhookForIssues(webhookName string, webhooks []admissionregis
 				issues = append(issues, WebhookIssue{
 					Name:        fmt.Sprintf("%s[%d]", webhookName, i),
 					Description: "Webhook service reference doesn't specify a port, which might cause connection issues",
-					Severity:    "Medium",
+					Severity:    SeverityMedium,
 				})
 			}
 		}
@@ -285,11 +311,11 @@ func formatWebhookIssuesError(issues []WebhookIssue) error {
 		issueStr := fmt.Sprintf("- %s: %s", issue.Name, issue.Description)
 
 		switch issue.Severity {
-		case "High":
+		case SeverityHigh:
 			highSeverityIssues = append(highSeverityIssues, issueStr)
-		case "Medium":
+		case SeverityMedium:
 			mediumSeverityIssues = append(mediumSeverityIssues, issueStr)
-		case "Low":
+		case SeverityLow:
 			lowSeverityIssues = append(lowSeverityIssues, issueStr)
 		}
 	}

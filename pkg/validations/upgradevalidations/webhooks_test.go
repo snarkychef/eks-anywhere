@@ -398,6 +398,8 @@ func TestValidateCustomWebhooks(t *testing.T) {
 		},
 	}
 
+	// No need to declare unused variables
+
 	// Run the regular tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
