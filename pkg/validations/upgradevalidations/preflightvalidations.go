@@ -200,7 +200,7 @@ func (u *UpgradeValidations) PreflightValidations(ctx context.Context) []validat
 				return &validations.ValidationResult{
 					Name:        "validate custom webhooks",
 					Remediation: "ensure that any custom webhooks installed in the cluster won't interfere with the upgrade process",
-					Err:         ValidateCustomWebhooks(ctx, k, u.Opts.WorkloadCluster),
+					Err:         ValidateCustomWebhooks(ctx, k, u.Opts.WorkloadCluster, u.Opts.SkippedValidations),
 				}
 			})
 	}

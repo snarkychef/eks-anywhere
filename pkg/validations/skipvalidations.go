@@ -7,10 +7,11 @@ import (
 
 // string values of supported validation names that can be skipped.
 const (
-	PDB             = "pod-disruption"
-	VSphereUserPriv = "vsphere-user-privilege"
-	EksaVersionSkew = "eksa-version-skew"
-	CustomWebhook   = "custom-webhook"
+	PDB                      = "pod-disruption"
+	VSphereUserPriv          = "vsphere-user-privilege"
+	EksaVersionSkew          = "eksa-version-skew"
+	CustomWebhook            = "custom-webhook"         // Skip all webhook validations
+	CustomWebhookNonCritical = "custom-webhook-noncrit" // Skip non-critical (medium and low) risk webhook validations
 )
 
 // ValidSkippableValidationsMap returns a map for all valid skippable validations as keys, defaulting values to false.

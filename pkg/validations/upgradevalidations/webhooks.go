@@ -22,7 +22,7 @@ type WebhookIssue struct {
 
 // ValidateCustomWebhooks returns an error if any custom webhooks are detected on a cluster
 // that might interfere with the upgrade process.
-func ValidateCustomWebhooks(ctx context.Context, k validations.KubectlClient, cluster *types.Cluster) error {
+func ValidateCustomWebhooks(ctx context.Context, k validations.KubectlClient, cluster *types.Cluster, skippedValidations map[string]bool) error {
 	// Check for ValidatingWebhookConfigurations
 	validatingWebhooks := &admissionregistrationv1.ValidatingWebhookConfigurationList{}
 	if err := k.List(ctx, cluster.KubeconfigFile, validatingWebhooks); err != nil {
@@ -63,9 +63,34 @@ func ValidateCustomWebhooks(ctx context.Context, k validations.KubectlClient, cl
 		issues = append(issues, webhookIssues...)
 	}
 
-	// If any issues are found, return an error with details
-	if len(issues) > 0 {
-		return formatWebhookIssuesError(issues)
+	// If skip all webhook validations is enabled, return nil
+	if skippedValidations[validations.CustomWebhook] {
+		return nil
+	}
+
+	// Filter issues based on severity and skip flags
+	var filteredIssues []WebhookIssue
+	for _, issue := range issues {
+		switch issue.Severity {
+		case "High":
+			// High severity issues are always included unless all webhook validations are skipped
+			filteredIssues = append(filteredIssues, issue)
+		case "Medium", "Low":
+			// Medium and Low severity issues are included unless non-critical or all webhook validations are skipped
+			if !skippedValidations[validations.CustomWebhookNonCritical] {
+				filteredIssues = append(filteredIssues, issue)
+			}
+		}
+	}
+
+	// If any filtered issues are found, return an error with details
+	if len(filteredIssues) > 0 {
+		return formatWebhookIssuesError(filteredIssues)
+	}
+
+	// If there were issues but they were all filtered out by skip flags, return nil
+	if len(issues) > 0 && len(filteredIssues) == 0 {
+		return nil
 	}
 
 	// If no specific issues are found but custom webhooks exist, return a general warning

@@ -323,6 +323,82 @@ func TestValidateCustomWebhooks(t *testing.T) {
 		},
 	}
 
+	// Add tests for skipping validations
+	skipTests := []struct {
+		name                   string
+		validatingWebhooks     []admissionregistrationv1.ValidatingWebhookConfiguration
+		skippedValidations     map[string]bool
+		expectError            bool
+		expectedErrorSubstring string
+	}{
+		{
+			name: "Skip all webhook validations",
+			validatingWebhooks: []admissionregistrationv1.ValidatingWebhookConfiguration{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "custom-validating-webhook",
+					},
+					Webhooks: []admissionregistrationv1.ValidatingWebhook{
+						{
+							Name:           "webhook1.example.com",
+							FailurePolicy:  &failurePolicy,
+							TimeoutSeconds: &shortTimeout,
+							Rules: []admissionregistrationv1.RuleWithOperations{
+								{
+									Rule: admissionregistrationv1.Rule{
+										APIGroups:   []string{"apps"},
+										APIVersions: []string{"v1"},
+										Resources:   []string{"deployments"},
+									},
+									Operations: []admissionregistrationv1.OperationType{"CREATE", "UPDATE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			skippedValidations: map[string]bool{
+				validations.CustomWebhook:            true,
+				validations.CustomWebhookNonCritical: false,
+			},
+			expectError: false,
+		},
+		{
+			name: "Skip non-critical risk webhook validations",
+			validatingWebhooks: []admissionregistrationv1.ValidatingWebhookConfiguration{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "custom-validating-webhook",
+					},
+					Webhooks: []admissionregistrationv1.ValidatingWebhook{
+						{
+							Name:           "webhook1.example.com",
+							FailurePolicy:  &failurePolicy, // High severity issue
+							TimeoutSeconds: &shortTimeout,  // Medium severity issue
+							Rules: []admissionregistrationv1.RuleWithOperations{
+								{
+									Rule: admissionregistrationv1.Rule{
+										APIGroups:   []string{"apps"},
+										APIVersions: []string{"v1"},
+										Resources:   []string{"deployments"},
+									},
+									Operations: []admissionregistrationv1.OperationType{"CREATE", "UPDATE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			skippedValidations: map[string]bool{
+				validations.CustomWebhook:            false,
+				validations.CustomWebhookNonCritical: true,
+			},
+			expectError:            true,
+			expectedErrorSubstring: "HIGH SEVERITY ISSUES",
+		},
+	}
+
+	// Run the regular tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -351,7 +427,13 @@ func TestValidateCustomWebhooks(t *testing.T) {
 					return nil
 				})
 
-			err := upgradevalidations.ValidateCustomWebhooks(ctx, k, cluster)
+			// Create a map of skipped validations with all set to false
+			skippedValidations := map[string]bool{
+				validations.CustomWebhook:            false,
+				validations.CustomWebhookNonCritical: false,
+			}
+
+			err := upgradevalidations.ValidateCustomWebhooks(ctx, k, cluster, skippedValidations)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -365,6 +447,46 @@ func TestValidateCustomWebhooks(t *testing.T) {
 				if tt.expectMediumSeverity {
 					assert.Contains(t, err.Error(), "MEDIUM SEVERITY ISSUES")
 				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+
+	// Run the skip validation tests
+	for _, tt := range skipTests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			ctrl := gomock.NewController(t)
+			k := mocks.NewMockKubectlClient(ctrl)
+			cluster := &types.Cluster{
+				Name:           "test-cluster",
+				KubeconfigFile: "kubeconfig",
+			}
+
+			// Setup mock for validating webhooks
+			k.EXPECT().
+				List(ctx, cluster.KubeconfigFile, gomock.AssignableToTypeOf(&admissionregistrationv1.ValidatingWebhookConfigurationList{})).
+				DoAndReturn(func(_ context.Context, _ string, obj runtime.Object) error {
+					webhookList := obj.(*admissionregistrationv1.ValidatingWebhookConfigurationList)
+					webhookList.Items = tt.validatingWebhooks
+					return nil
+				})
+
+			// Setup mock for mutating webhooks (empty for these tests)
+			k.EXPECT().
+				List(ctx, cluster.KubeconfigFile, gomock.AssignableToTypeOf(&admissionregistrationv1.MutatingWebhookConfigurationList{})).
+				DoAndReturn(func(_ context.Context, _ string, obj runtime.Object) error {
+					webhookList := obj.(*admissionregistrationv1.MutatingWebhookConfigurationList)
+					webhookList.Items = []admissionregistrationv1.MutatingWebhookConfiguration{}
+					return nil
+				})
+
+			err := upgradevalidations.ValidateCustomWebhooks(ctx, k, cluster, tt.skippedValidations)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrorSubstring)
 			} else {
 				assert.NoError(t, err)
 			}
