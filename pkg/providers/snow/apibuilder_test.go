@@ -201,7 +201,7 @@ func wantKubeadmControlPlane(kubeVersion v1alpha1.KubernetesVersion) *controlpla
 		},
 	}
 
-	if kubeVersion == "1.29" {
+	if kubeVersion == "1.29" || kubeVersion == "1.30" || kubeVersion == "1.31" || kubeVersion == "1.32" {
 		kcp.Spec.KubeadmConfigSpec.ClusterConfiguration.FeatureGates = map[string]bool{
 			"EtcdLearnerMode": false,
 		}
