@@ -230,6 +230,8 @@ spec:
         devices:
         - dhcp4: true
           networkName: {{.vsphereNetwork}}
+        - dhcp4: true
+          networkName: "/SDDC-Datacenter/network/sddc-cgw-network-1"
       numCPUs: {{.workloadVMsNumCPUs}}
       resourcePool: '{{.workerVsphereResourcePool}}'
       server: {{.vsphereServer}}

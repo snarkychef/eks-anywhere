@@ -61,6 +61,8 @@ spec:
         devices:
         - dhcp4: true
           networkName: {{.vsphereNetwork}}
+        - dhcp4: true
+          networkName: "/SDDC-Datacenter/network/sddc-cgw-network-1"
       numCPUs: {{.controlPlaneVMsNumCPUs}}
       resourcePool: '{{.controlPlaneVsphereResourcePool}}'
       server: {{.vsphereServer}}
@@ -278,6 +280,8 @@ spec:
             env:
             - name: vip_arp
               value: "true"
+            - name: vip_interface
+              value: "eth0"
             - name: port
               value: "6443"
             - name: vip_cidr
@@ -681,6 +685,8 @@ spec:
         devices:
           - dhcp4: true
             networkName: {{.vsphereNetwork}}
+          - dhcp4: true
+            networkName: "/SDDC-Datacenter/network/sddc-cgw-network-1"
       numCPUs: {{.etcdVMsNumCPUs}}
       resourcePool: '{{.etcdVsphereResourcePool}}'
       server: {{.vsphereServer}}
