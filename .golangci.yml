@@ -12,6 +12,12 @@ linters:
       exclude:
         - (?i)^\s*todo
       period: true
+    revive:
+      rules:
+        - name: dot-imports
+          arguments:
+            - allowedPackages:
+              - github.com/onsi/gomega
   exclusions:
     generated: lax
     presets:

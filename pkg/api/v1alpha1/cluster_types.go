@@ -325,6 +325,12 @@ type ControlPlaneConfiguration struct {
 	// If not specified, the default audit policy will be used.
 	// +optional
 	AuditPolicyContent string `json:"auditPolicyContent,omitempty"`
+	// SkipAdmissionForSystemResources skips admission plugin checks for system-level Kubernetes resources
+	// during critical control plane operations. When enabled, operations on system resources (such as
+	// kube-system RBAC, API service registrations, flow control, etc.) will bypass admission plugins
+	// to prevent potential deadlocks or failures during cluster maintenance and upgrades.
+	// +optional
+	SkipAdmissionForSystemResources *bool `json:"skipAdmissionForSystemResources,omitempty"`
 }
 
 // MachineHealthCheck allows to configure timeouts for machine health checks. Machine Health Checks are responsible for remediating unhealthy Machines.
@@ -379,10 +385,14 @@ func (n *ControlPlaneConfiguration) Equal(o *ControlPlaneConfiguration) bool {
 	if n == nil || o == nil {
 		return false
 	}
+	skipAdmissionEqual := (n.SkipAdmissionForSystemResources == o.SkipAdmissionForSystemResources) ||
+		(n.SkipAdmissionForSystemResources != nil && o.SkipAdmissionForSystemResources != nil &&
+			*n.SkipAdmissionForSystemResources == *o.SkipAdmissionForSystemResources)
+
 	return n.Count == o.Count && n.MachineGroupRef.Equal(o.MachineGroupRef) &&
 		TaintsSliceEqual(n.Taints, o.Taints) && MapEqual(n.Labels, o.Labels) &&
 		SliceEqual(n.CertSANs, o.CertSANs) && MapEqual(n.APIServerExtraArgs, o.APIServerExtraArgs) &&
-		n.AuditPolicyContent == o.AuditPolicyContent
+		n.AuditPolicyContent == o.AuditPolicyContent && skipAdmissionEqual
 }
 
 type Endpoint struct {
