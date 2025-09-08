@@ -168,6 +168,9 @@ spec:
         certSANs:
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        extraEnvs:
+        - name: EKS_PATCH_EXCLUSION_RULES_FILE
+          value: /etc/kubernetes/admission-webhook-exclusion.json
         extraArgs:
 {{- if (lt (atoi $kube_minor_version) 33) }}
           cloud-provider: external
@@ -199,6 +202,15 @@ spec:
           name: audit-log-dir
           pathType: DirectoryOrCreate
           readOnly: false
+{{- if (eq .format "bottlerocket") }}
+        - hostPath: /var/lib/kubeadm/admission-webhook-exclusion.json
+{{- else }}
+        - hostPath: /etc/kubernetes/admission-webhook-exclusion.json
+{{- end }}
+          mountPath: /etc/kubernetes/admission-webhook-exclusion.json
+          name: webhook-exclusion-rules
+          pathType: File
+          readOnly: true
 {{- if .awsIamAuth}}
         - hostPath: /var/lib/kubeadm/aws-iam-authenticator/
           mountPath: /etc/kubernetes/aws-iam-authenticator/
@@ -322,6 +334,22 @@ spec:
         status: {}
       owner: root:root
       path: /etc/kubernetes/manifests/kube-vip.yaml
+    - content: |
+        [
+          {
+              "apiGroup":"",
+              "apiVersion":"v1",
+              "kind":"Pod",
+              "scope":"Namespaced",
+              "namespace":"kube-system",
+              "name":[
+                "cilium-*"
+              ],
+              "username":"*"
+          }
+        ]
+      owner: root:root
+      path: /etc/kubernetes/admission-webhook-exclusion.json
     - content: |
 {{ .auditPolicy | indent 8 }}
       owner: root:root
