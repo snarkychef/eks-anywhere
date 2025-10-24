@@ -356,8 +356,41 @@ Next Steps:
 3. **Dependency Check**: Ensure all referenced framework functions exist
 4. **Configuration Validation**: Verify YAML configuration files are valid
 
+## Test Coverage Notes
+
+### Version-Specific Coverage Patterns
+
+Based on the current test structure, CloudStack maintains **full version coverage** for most test categories. However, there are some specific patterns to note:
+
+1. **API Server Extra Args Tests**: 
+   - Only maintained for the **newest version** (currently 133)
+   - When adding K8s 1.34: **Replace 133 with 134**
+   - Pattern: Only `TestCloudStackKubernetes{NEW_VERSION}RedHat9APIServerExtraArgsSimpleFlow` and upgrade flow variant
+
+2. **Kubelet Configuration Tests**:
+   - Start from K8s **1.29 onwards** (no 1.28 test)
+   - When adding K8s 1.34: **Add 134 alongside existing 129-133**
+   - Pattern: Full coverage from 129+
+
+3. **Simple Flow Tests**:
+   - Full coverage for all versions
+   - Note: ThreeReplicasFiveWorkers, MultiEndpoint, and DifferentNamespace tests maintained only for newest version
+   - When adding K8s 1.34: **Replace 133 with 134** for these three test variants
+
+4. **Other Test Categories**:
+   - Generally maintained for all supported versions
+   - Follow the standard "add new version" pattern
+
+### Test Reduction Strategy
+
+Unlike vSphere, CloudStack has **minimal test reduction**. Most test categories maintain full version coverage (128-133 currently). The main exceptions are:
+- API Server Extra Args: Latest version only
+- Certain simple flow variants: Latest version only (ThreeReplicasFiveWorkers, MultiEndpoint, DifferentNamespace)
+- Kubelet Configuration: Starts from 129 (no 128)
+
 ## Notes
-- This plan is based on the CloudStack Kubernetes 1.32 implementation
+- This plan is based on the CloudStack Kubernetes 1.32-1.33 implementation
+- CloudStack maintains more comprehensive version coverage compared to vSphere
 - Adjust version numbers and constants according to target Kubernetes version
 - Some tests may need provider-specific modifications
 - Consider any breaking changes in the target Kubernetes version

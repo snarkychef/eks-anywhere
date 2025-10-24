@@ -11,10 +11,13 @@ When EKS Anywhere adds support for a new Kubernetes version, comprehensive e2e t
 Use Cline's `new_task` tool to create separate tasks for each major component to manage context effectively:
 
 ### Task 1: Update Test Configuration Files
-**Scope**: Update configuration files that control test execution
+**Scope**: Update configuration files that control test execution, build system, and documentation
 **Files**: 
 - `test/e2e/QUICK_TESTS.yaml`
 - `test/e2e/constants.go`
+- `Makefile`
+- `scripts/e2e_test_docker.sh`
+- `test/e2e/README.md`
 
 ### Task 2: Update Core Test Functions (Part 1)
 **Scope**: Update existing test functions to use the new Kubernetes version
@@ -56,6 +59,16 @@ Based on the reference pattern, please:
 2. Update `test/e2e/constants.go`:
    - Add `v1alpha1.Kube{NEW_VERSION}` to the `KubeVersions` slice
    - Maintain the existing order (ascending version numbers)
+
+3. Update `Makefile`:
+   - Change the `DOCKER_E2E_TEST` variable from `TestDockerKubernetes{PREVIOUS_VERSION}SimpleFlow` to `TestDockerKubernetes{NEW_VERSION}SimpleFlow`
+
+4. Update `scripts/e2e_test_docker.sh`:
+   - Change the `TEST_REGEX` default value from `TestDockerKubernetes{PREVIOUS_VERSION}SimpleFlow` to `TestDockerKubernetes{NEW_VERSION}SimpleFlow`
+
+5. Update `test/e2e/README.md`:
+   - Update all occurrences of `TestDockerKubernetes{PREVIOUS_VERSION}SimpleFlow` to `TestDockerKubernetes{NEW_VERSION}SimpleFlow`
+   - This includes comments and example commands
 
 Variables to replace:
 - {NEW_VERSION}: The new Kubernetes version number (e.g., 134)
@@ -192,24 +205,31 @@ I need to update upgrade test functions in `test/e2e/docker_test.go` to support 
 
 Please update the following types of upgrade tests:
 
-1. **Version-to-Version Upgrade Tests**: Update functions like:
-   - `TestDockerKubernetes{PREV_PREV}To{PREVIOUS_VERSION}StackedEtcdUpgrade` → `TestDockerKubernetes{PREVIOUS_VERSION}To{NEW_VERSION}StackedEtcdUpgrade`
-   - `TestDockerKubernetes{PREV_PREV}To{PREVIOUS_VERSION}ExternalEtcdUpgrade` → `TestDockerKubernetes{PREVIOUS_VERSION}To{NEW_VERSION}ExternalEtcdUpgrade`
+1. **Version-to-Version Upgrade Tests**: Add functions like:
+   - `TestDockerKubernetes{PREVIOUS_VERSION}To{NEW_VERSION}StackedEtcdUpgrade`
+   - `TestDockerKubernetes{PREVIOUS_VERSION}To{NEW_VERSION}ExternalEtcdUpgrade`
 
-2. **Upgrade from Latest Release Tests**: Update functions like:
-   - `TestDockerKubernetes{PREV_PREV}to{PREVIOUS_VERSION}UpgradeFromLatestMinorRelease` → `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}UpgradeFromLatestMinorRelease`
-   - `TestDockerKubernetes{PREV_PREV}to{PREVIOUS_VERSION}GithubFluxEnabledUpgradeFromLatestMinorRelease` → `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}GithubFluxEnabledUpgradeFromLatestMinorRelease`
+2. **CLI-based Upgrade from Latest Release Tests**: Add functions like:
+   - `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}UpgradeFromLatestMinorRelease`
+   - `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}GithubFluxEnabledUpgradeFromLatestMinorRelease`
 
-3. **Workload Cluster Upgrade Tests**: Update functions like:
-   - `TestDockerUpgradeKubernetes{PREV_PREV}to{PREVIOUS_VERSION}WorkloadClusterScaleupAPI` → `TestDockerUpgradeKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}WorkloadClusterScaleupAPI`
-   - Update similar workload cluster upgrade functions
+3. **Workload Cluster GitOps Upgrade Tests** (only if {NEW_VERSION} >= 133):
+   - Add: `TestDockerKubernetes{NEW_VERSION}UpgradeWorkloadClusterWithGithubFlux`
+   - Pattern: Upgrades workload cluster from {PREVIOUS_VERSION}→{NEW_VERSION} using GitOps
+   - This test pattern started at K8s 132
 
-4. **Management Cluster Tests**: Update:
-   - `TestDockerKubernetes{PREVIOUS_VERSION}WithOIDCManagementClusterUpgradeFromLatestSideEffects` → `TestDockerKubernetes{NEW_VERSION}WithOIDCManagementClusterUpgradeFromLatestSideEffects`
+4. **API-based Workload Cluster Upgrade Tests** (only if {PREVIOUS_VERSION} >= 131):
+   - Add: `TestDockerUpgradeKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}WorkloadClusterScaleupGitHubFluxAPI`
+   - Pattern: API-based upgrade with GitHub Flux
+   - This test pattern started at K8s 131→132
+   - Note: Do NOT add `UpgradeFromLatestMinorReleaseAPI` variant - only the CLI-based version exists
 
-5. **Etcd Scale with Upgrade Tests**: Update:
-   - `TestDockerKubernetes{PREV_PREV}to{PREVIOUS_VERSION}EtcdScaleUp` → `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}EtcdScaleUp`
-   - `TestDockerKubernetes{PREV_PREV}to{PREVIOUS_VERSION}EtcdScaleDown` → `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}EtcdScaleDown`
+5. **Management Cluster Tests**: Add:
+   - `TestDockerKubernetes{NEW_VERSION}WithOIDCManagementClusterUpgradeFromLatestSideEffects`
+
+6. **Etcd Scale with Upgrade Tests**: Add:
+   - `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}EtcdScaleUp`
+   - `TestDockerKubernetes{PREVIOUS_VERSION}to{NEW_VERSION}EtcdScaleDown`
 
 Pattern for upgrade tests:
 - Update function names to reflect new version transitions
@@ -220,8 +240,37 @@ Pattern for upgrade tests:
 Variables:
 - {NEW_VERSION}: {NEW_VERSION}
 - {PREVIOUS_VERSION}: {PREVIOUS_VERSION}
-- {PREV_PREV}: {PREV_PREV_VERSION} (version before previous)
 ```
+
+## Test Pattern Version Requirements
+
+Some test patterns were introduced in later Kubernetes versions. Verify version requirements before adding:
+
+### Patterns Starting from K8s 1.31→1.32:
+- `TestDockerKubernetes{PREV}to{NEW}UpgradeFromLatestMinorReleaseAPI` (only API variant, not CLI)
+- `TestDockerUpgradeKubernetes{PREV}to{NEW}WorkloadClusterScaleupGitHubFluxAPI`
+
+**For K8s 1.34**: Add `TestDockerUpgradeKubernetes133to134WorkloadClusterScaleupGitHubFluxAPI`
+
+### Patterns Starting from K8s 1.32:
+- `TestDockerKubernetes{NEW}UpgradeWorkloadClusterWithGithubFlux` (upgrades from {PREV}→{NEW})
+
+**For K8s 1.34**: Add `TestDockerKubernetes134UpgradeWorkloadClusterWithGithubFlux` (upgrades 133→134)
+
+### Patterns Starting from K8s 1.29:
+- `TestDockerKubernetes{NEW}KubeletConfigurationSimpleFlow`
+
+**For K8s 1.34**: Add `TestDockerKubernetes134KubeletConfigurationSimpleFlow`
+
+### Patterns Starting from K8s 1.33:
+- `TestDockerKubernetes{NEW}SkipAdmissionForSystemResources`
+
+**For K8s 1.34**: Add `TestDockerKubernetes134SkipAdmissionForSystemResources`
+
+### Important Notes:
+- **Do NOT add** `TestDockerKubernetes{PREV}to{NEW}UpgradeFromLatestMinorReleaseAPI` - this API variant doesn't exist. Only the CLI-based variant exists (without "API" suffix).
+- Always check existing test patterns before blindly adding new tests
+- When in doubt, search for similar patterns in earlier versions to confirm
 
 ## Usage Instructions
 
@@ -229,27 +278,67 @@ Variables:
    - Identify the new Kubernetes version number (e.g., 134)
    - Identify the previous version number (e.g., 133)
    - Identify the provider name (Docker)
+   - **Check version requirements** above to see which patterns apply
 
 2. **Variable Substitution**:
    Replace the following variables in all prompts:
    - `{NEW_VERSION}`: New Kubernetes version (e.g., 134)
    - `{PREVIOUS_VERSION}`: Previous Kubernetes version (e.g., 133)
-   - `{PREV_PREV_VERSION}`: Version before previous (e.g., 132)
 
 3. **Execution**:
    - Use Cline's `new_task` tool to create separate tasks for each section
    - Execute tasks in order (1-6)
    - Verify each task completion before proceeding to the next
+   - **Verify version requirements** before adding tests from Task 6
 
 4. **Validation**:
    - After all tasks are complete, run the tests to ensure they compile and execute correctly
    - Check that all version references are updated consistently
    - Verify that upgrade paths are logical (previous → new version)
+   - Verify no incorrect test patterns were added
+
+## Recent Test Additions (K8s 1.33+)
+
+### Skip Admission Plugins Test (Added October 2025, commit eb6c48a12)
+A new test for skipping admission plugins during critical control plane upgrades:
+- `TestDockerKubernetes133SkipAdmissionForSystemResources`
+
+**When adding K8s 1.34**: Add `TestDockerKubernetes134SkipAdmissionForSystemResources` alongside existing 133 test (Tier 2 - full coverage pattern).
+
+## Test Coverage Notes
+
+### Version-Specific Coverage Patterns
+
+Docker maintains **full version coverage** for most test categories, similar to CloudStack and Nutanix. However, note these specific patterns:
+
+1. **Kubelet Configuration Tests**:
+   - Start from K8s **1.29 onwards** (no 1.28 test)
+   - When adding K8s 1.34: **Add 134 alongside existing 129-133**
+   - Pattern: Full coverage from 129+
+
+2. **Skip Admission Plugins Test**:
+   - Added in K8s 1.33
+   - When adding K8s 1.34: **Add 134 alongside 133**
+   - Pattern: Full coverage from 133+
+
+3. **All Other Test Categories**:
+   - Maintain full version coverage for all supported versions
+   - Follow the standard "add new version" pattern
+
+### Test Coverage Strategy
+
+Docker uses a **full version coverage** approach for nearly all test categories. When adding K8s 1.34:
+- **Add new version** (134) alongside existing versions (128-133)
+- **Exception**: For KubeletConfiguration, verify pattern starts from 129
+
+Unlike vSphere (oldest/newest only) or Tinkerbell (replacement), Docker maintains comprehensive historical test coverage similar to CloudStack and Nutanix.
 
 ## Notes
 
 - This plan is specifically for the Docker provider
+- Docker maintains full version coverage similar to CloudStack and Nutanix
 - Kubernetes 1.33 support has already been added to the Docker provider (as of the referenced patch)
 - Always verify that the new Kubernetes version constant exists in the codebase before starting
 - Consider running a subset of tests first to validate the changes before full test suite execution
 - When adding support for Kubernetes 1.34, use 1.33 as the {PREVIOUS_VERSION} and 1.32 as the {PREV_PREV_VERSION}
+- **Important**: Docker tests are generally additive - old version tests are preserved for backward compatibility

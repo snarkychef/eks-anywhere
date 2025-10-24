@@ -328,9 +328,32 @@ Use the following parameters:
 Follow the subtask decomposition strategy outlined in nutanix-e2e-prompt.md to avoid context overflow.
 ```
 
+## Test Coverage Notes
+
+### Version-Specific Coverage Patterns
+
+Nutanix maintains **full version coverage** for most test categories. However, note these specific patterns:
+
+1. **Kubelet Configuration Tests**:
+   - Historically maintained from K8s **1.29 to 1.32** (no 1.28, no 1.33+)
+   - Pattern appears inconsistent - may have been added in 1.29 and not maintained beyond 1.32
+   - **Recommendation**: When adding K8s 1.34, follow the latest pattern in the codebase
+   - Check if 1.33 tests exist, if so add 1.34, otherwise verify the intended pattern
+
+2. **All Other Test Categories**:
+   - Maintain full version coverage
+   - Follow the standard "add new version" pattern
+
+### Test Coverage Strategy
+
+Unlike vSphere (which uses oldest/newest only) and Tinkerbell (which uses replacement), Nutanix generally maintains **full version coverage** for all test categories. When adding K8s 1.34:
+- **Add new version** (134) alongside existing versions for all categories
+- **Exception**: Verify KubeletConfiguration pattern before adding
+
 ## Notes
 
 - This prompt plan is based on the reference commit for Kubernetes 1.32 Nutanix e2e tests
+- Nutanix maintains more comprehensive version coverage similar to CloudStack
 - The pattern should be adaptable to other providers with similar structure
 - Always verify that the new Kubernetes version constant exists in the codebase before proceeding
 - Consider running existing tests to ensure no regressions are introduced
