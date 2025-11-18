@@ -3,7 +3,9 @@ package curatedpackages
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content/memory"
 	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/retry"
 
 	"github.com/aws/eks-anywhere-packages/pkg/artifacts"
 	"github.com/aws/eks-anywhere-packages/pkg/bundle"
@@ -101,8 +105,24 @@ func PushBundle(ctx context.Context, ref, fileName string, fileContent []byte) e
 	}
 
 	// Configure repository with insecure option if needed
+	// When insecure is true, skip TLS certificate verification but still use HTTPS
 	if insecure, ok := ctx.Value(types.InsecureRegistry).(bool); ok && insecure {
-		repo.PlainHTTP = true
+		// Clone the default transport and customize TLS configuration
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+
+		// Create auth client with custom transport but preserve auth capabilities
+		repo.Client = &auth.Client{
+			Client: &http.Client{
+				Transport: retry.NewTransport(transport),
+			},
+			Header: http.Header{
+				"User-Agent": {"oras-go"},
+			},
+			Cache: auth.DefaultCache,
+		}
 	}
 
 	// Create memory store
